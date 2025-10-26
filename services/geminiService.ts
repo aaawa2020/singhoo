@@ -1,11 +1,29 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import type { AspectRatio, ImageQuality, GroundingSource } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set");
+let aiInstance: GoogleGenAI | null = null;
+
+// Gracefully initialize the AI client.
+// In an environment without `process` (like a browser), this will catch the error
+// and aiInstance will remain null, preventing the app from crashing.
+try {
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+        aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+} catch (error) {
+    console.warn(
+        "Could not initialize Gemini API client. This is expected in browser-only environments. API calls will fail until an API key is provided.",
+        error
+    );
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// A helper function to ensure the AI client is initialized before any API call.
+const getAi = (): GoogleGenAI => {
+    if (!aiInstance) {
+        throw new Error("Gemini API client is not initialized. Please ensure the API_KEY is configured in your execution environment.");
+    }
+    return aiInstance;
+}
 
 const fileToGenerativePart = (base64Data: string) => {
     const match = base64Data.match(/^data:(.+);base64,(.+)$/);
@@ -24,6 +42,7 @@ const fileToGenerativePart = (base64Data: string) => {
 
 
 export const generateImage = async (prompt: string, aspectRatio: AspectRatio, quality: ImageQuality): Promise<string> => {
+    const ai = getAi();
     let qualityPrompt = '';
     if (quality === 'hd') {
         qualityPrompt = '超高细节, 最佳质量, 8k, 精细渲染, ';
@@ -54,6 +73,7 @@ export const editImage = async (
     creativity: number,     // 0-100
     negativePrompt: string
 ): Promise<string> => {
+    const ai = getAi();
     const imagePart = fileToGenerativePart(imageBase64);
     
     let fullPrompt = prompt;
@@ -101,6 +121,7 @@ export const editImage = async (
 };
 
 export const generateComplexScene = async (prompt: string): Promise<string> => {
+    const ai = getAi();
     const fullPrompt = `根据以下想法，生成一个丰富、详细且富有表现力的场景描述，适用于galgame插画。请描述角色的外观、表情、姿势、环境、光照和整体氛围。想法：“${prompt}”`;
 
     const response = await ai.models.generateContent({
@@ -115,6 +136,7 @@ export const generateComplexScene = async (prompt: string): Promise<string> => {
 };
 
 export const getCharacterIdeas = async (prompt: string): Promise<{ text: string; sources: GroundingSource[] }> => {
+    const ai = getAi();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
