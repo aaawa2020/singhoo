@@ -48,22 +48,27 @@ export const generateImage = async (prompt: string, aspectRatio: AspectRatio, qu
         qualityPrompt = '超高细节, 最佳质量, 8k, 精细渲染, ';
     }
     
-    const fullPrompt = `galgame插画, 动漫风格, ${qualityPrompt}${prompt}`;
+    // For gemini-2.5-flash-image, aspectRatio is part of the prompt.
+    const fullPrompt = `galgame插画, 动漫风格, 宽高比 ${aspectRatio}, ${qualityPrompt}${prompt}`;
 
-    const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: fullPrompt,
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+            parts: [{ text: fullPrompt }],
+        },
         config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: aspectRatio,
+            responseModalities: [Modality.IMAGE],
         },
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-        return response.generatedImages[0].image.imageBytes;
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+    for (const part of parts) {
+        if (part.inlineData) {
+            return part.inlineData.data;
+        }
     }
-    throw new Error('图像生成失败。');
+
+    throw new Error('图像生成失败。可能是由于安全设置或无效的输入。');
 };
 
 export const editImage = async (
@@ -76,26 +81,31 @@ export const editImage = async (
     const ai = getAi();
     const imagePart = fileToGenerativePart(imageBase64);
     
-    let fullPrompt = prompt;
+    // Reworked prompt logic with keyword-based instructions for better reliability.
+    const promptParts = [prompt];
 
     // Interpret style strength
     if (styleStrength < 25) {
-        fullPrompt = `进行一个非常细微的改动：${prompt}。尽可能保持原始图像的风格。`;
+        promptParts.push('进行细微改动');
+        promptParts.push('尽可能保留原图风格');
     } else if (styleStrength > 75) {
-        fullPrompt = `对这张图片进行大刀阔斧的修改：${prompt}。可以显著改变图片的风格。`;
+        promptParts.push('进行显著改动');
+        promptParts.push('可大幅改变艺术风格');
     }
 
     // Interpret creativity
     if (creativity < 25) {
-        fullPrompt += ` 请严格按照文字描述进行操作。`;
+        promptParts.push('严格遵循文字描述');
     } else if (creativity > 75) {
-        fullPrompt += ` 请发挥你的想象力，进行创造性的诠释。`;
+        promptParts.push('发挥创意');
     }
 
     // Add negative prompt
     if (negativePrompt && negativePrompt.trim() !== '') {
-        fullPrompt += ` 请务必避免出现以下内容：${negativePrompt}。`;
+        promptParts.push(`避免出现：${negativePrompt}`);
     }
+    
+    const fullPrompt = promptParts.join('，');
     
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
