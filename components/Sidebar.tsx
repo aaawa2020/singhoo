@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Mode, AspectRatio, ImageQuality, HistoryItem } from '../types';
-import { GenerateIcon, EditIcon, SceneIcon, IdeasIcon, ChevronDownIcon } from './Icons';
+import { GenerateIcon, EditIcon, SceneIcon, IdeasIcon, ChevronDownIcon, SettingsIcon } from './Icons';
 
 interface SidebarProps {
   mode: Mode;
@@ -34,6 +34,8 @@ interface SidebarProps {
   setCreativity: (value: number) => void;
   negativePrompt: string;
   setNegativePrompt: (value: string) => void;
+  hasApiKey: boolean;
+  onOpenApiKeyModal: () => void;
 }
 
 const NavButton: React.FC<{
@@ -94,11 +96,13 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
     setAspectRatio, imageQuality, setImageQuality, isLoading, onGenerateImage, onEditImage, onGenerateScene,
     onGetIdeas, onFileChange, imageToEdit, history, onSelectHistoryItem,
     isAdvancedEditOpen, setIsAdvancedEditOpen, styleStrength, setStyleStrength,
-    creativity, setCreativity, negativePrompt, setNegativePrompt
+    creativity, setCreativity, negativePrompt, setNegativePrompt,
+    hasApiKey, onOpenApiKeyModal
   } = props;
   
   const aspectRatios: AspectRatio[] = ['1:1', '3:4', '4:3', '9:16', '16:9'];
   const qualities: {quality: ImageQuality, label: string}[] = [{quality: 'standard', label: '标准'}, {quality: 'hd', label: '高清'}];
+  const noApiKeyTitle = "请先在设置中配置您的 API Key";
 
   return (
     <aside className="w-full md:w-96 bg-gray-800/50 backdrop-blur-sm border-r border-gray-700/50 flex flex-col flex-shrink-0">
@@ -140,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     {qualities.map(q => <QualityButton key={q.quality} quality={q.quality} label={q.label} currentQuality={imageQuality} setQuality={setImageQuality} />)}
                 </div>
 
-                <button onClick={onGenerateImage} disabled={isLoading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-pink-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                <button onClick={onGenerateImage} disabled={isLoading || !hasApiKey} title={!hasApiKey ? noApiKeyTitle : ""} className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-pink-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                   {isLoading ? '生成中...' : '生成'}
                 </button>
               </div>
@@ -195,7 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     )}
                 </div>
                 
-                <button onClick={onEditImage} disabled={isLoading || !imageToEdit} className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-pink-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                <button onClick={onEditImage} disabled={isLoading || !imageToEdit || !hasApiKey} title={!hasApiKey ? noApiKeyTitle : ""} className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-pink-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                   {isLoading ? '编辑中...' : '应用编辑'}
                 </button>
               </div>
@@ -207,7 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                   </div>
                   <label htmlFor="scene-prompt" className="block text-sm font-medium text-gray-300">场景想法</label>
                   <textarea id="scene-prompt" value={scenePrompt} onChange={(e) => setScenePrompt(e.target.value)} rows={4} className="w-full bg-gray-700/50 border border-gray-600 rounded-md p-2 text-sm text-gray-200 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
-                  <button onClick={onGenerateScene} disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                  <button onClick={onGenerateScene} disabled={isLoading || !hasApiKey} title={!hasApiKey ? noApiKeyTitle : ""} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                       {isLoading ? '生成中...' : '生成场景'}
                   </button>
                 </div>
@@ -219,7 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     </div>
                     <label htmlFor="ideas-prompt" className="block text-sm font-medium text-gray-300">问题</label>
                     <textarea id="ideas-prompt" value={ideasPrompt} onChange={(e) => setIdeasPrompt(e.target.value)} rows={4} className="w-full bg-gray-700/50 border border-gray-600 rounded-md p-2 text-sm text-gray-200 focus:ring-green-500 focus:border-green-500 transition"></textarea>
-                    <button onClick={onGetIdeas} disabled={isLoading} className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                    <button onClick={onGetIdeas} disabled={isLoading || !hasApiKey} title={!hasApiKey ? noApiKeyTitle : ""} className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-800/50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                         {isLoading ? '搜索中...' : '获取灵感'}
                     </button>
                 </div>
@@ -256,6 +260,15 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
             <p className="text-sm text-gray-500 text-center py-4">暂无历史记录。开始创作吧！</p>
           )}
         </div>
+      </div>
+      <div className="flex-shrink-0 p-4 border-t border-gray-700/50">
+          <button
+            onClick={onOpenApiKeyModal}
+            className="flex items-center w-full px-4 py-2 text-sm font-medium transition-colors duration-200 text-gray-400 hover:bg-gray-700/50 hover:text-gray-200 rounded-md"
+          >
+            <SettingsIcon className="w-5 h-5" />
+            <span className="ml-3">API Key 设置</span>
+          </button>
       </div>
     </aside>
   );

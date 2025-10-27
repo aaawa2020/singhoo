@@ -2,28 +2,51 @@ import { GoogleGenAI, Modality, Type } from "@google/genai";
 import type { AspectRatio, ImageQuality, GroundingSource } from '../types';
 
 let aiInstance: GoogleGenAI | null = null;
+let currentApiKey: string | null = null;
 
-// Gracefully initialize the AI client.
-// In an environment without `process` (like a browser), this will catch the error
-// and aiInstance will remain null, preventing the app from crashing.
-try {
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-        aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const getApiKey = (): string | null => {
+    try {
+        return localStorage.getItem('gemini_api_key');
+    } catch (e) {
+        console.error("Could not access localStorage:", e);
+        return null;
     }
-} catch (error) {
-    console.warn(
-        "Could not initialize Gemini API client. This is expected in browser-only environments. API calls will fail until an API key is provided.",
-        error
-    );
-}
+};
 
-// A helper function to ensure the AI client is initialized before any API call.
+export const setApiKey = (key: string): void => {
+    try {
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+        } else {
+            localStorage.removeItem('gemini_api_key');
+        }
+        // Invalidate instance so it's recreated with the new key on next call
+        aiInstance = null;
+        currentApiKey = null;
+    } catch (e) {
+        console.error("Could not access localStorage:", e);
+    }
+};
+
+export const hasApiKey = (): boolean => {
+    return !!getApiKey();
+};
+
 const getAi = (): GoogleGenAI => {
-    if (!aiInstance) {
-        throw new Error("Gemini API client is not initialized. Please ensure the API_KEY is configured in your execution environment.");
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error("请在设置中配置您的 Gemini API Key。");
     }
+
+    // Reuse instance if API key hasn't changed
+    if (aiInstance && currentApiKey === apiKey) {
+        return aiInstance;
+    }
+    
+    aiInstance = new GoogleGenAI({ apiKey });
+    currentApiKey = apiKey;
     return aiInstance;
-}
+};
 
 const fileToGenerativePart = (base64Data: string) => {
     const match = base64Data.match(/^data:(.+);base64,(.+)$/);
@@ -68,7 +91,7 @@ export const generateImage = async (prompt: string, aspectRatio: AspectRatio, qu
         }
     }
 
-    throw new Error('图像生成失败。可能是由于安全设置或无效的输入。');
+    throw new Error('图像生成失败。可能是由于安全设置、无效的输入或无效的API Key。');
 };
 
 export const editImage = async (
@@ -127,7 +150,7 @@ export const editImage = async (
         }
     }
 
-    throw new Error('图像编辑失败。可能是由于安全设置或无效的输入。');
+    throw new Error('图像编辑失败。可能是由于安全设置、无效的输入或无效的API Key。');
 };
 
 export const generateComplexScene = async (prompt: string): Promise<string> => {

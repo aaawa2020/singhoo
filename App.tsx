@@ -1,7 +1,16 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { MainContent } from './components/MainContent';
-import { generateImage, editImage, generateComplexScene, getCharacterIdeas } from './services/geminiService';
+import { ApiKeyModal } from './components/ApiKeyModal';
+import { 
+  generateImage, 
+  editImage, 
+  generateComplexScene, 
+  getCharacterIdeas,
+  setApiKey as saveApiKey,
+  getApiKey,
+  hasApiKey as checkHasApiKey
+} from './services/geminiService';
 import type { Mode, AspectRatio, ImageQuality, GroundingSource, HistoryItem } from './types';
 
 // Custom hook for managing state with undo/redo functionality
@@ -87,6 +96,27 @@ const App: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  useEffect(() => {
+    const key = getApiKey();
+    setApiKey(key);
+    const keyExists = checkHasApiKey();
+    setHasApiKey(keyExists);
+    if (!keyExists) {
+      setIsApiKeyModalOpen(true);
+    }
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    saveApiKey(key);
+    setApiKey(key);
+    setHasApiKey(checkHasApiKey());
+    setIsApiKeyModalOpen(false);
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -262,54 +292,64 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-gray-900 text-gray-100 md:overflow-hidden">
-      <Sidebar
-        mode={mode}
-        setMode={setMode}
-        prompt={prompt}
-        setPrompt={setPrompt}
-        editPrompt={editPrompt}
-        setEditPrompt={setEditPrompt}
-        scenePrompt={scenePrompt}
-        setScenePrompt={setScenePrompt}
-        ideasPrompt={ideasPrompt}
-        setIdeasPrompt={setIdeasPrompt}
-        aspectRatio={aspectRatio}
-        setAspectRatio={setAspectRatio}
-        imageQuality={imageQuality}
-        setImageQuality={setImageQuality}
-        isLoading={isLoading}
-        onGenerateImage={handleGenerateImage}
-        onEditImage={handleEditImage}
-        onGenerateScene={handleGenerateScene}
-        onGetIdeas={handleGetIdeas}
-        onFileChange={handleFileChange}
-        imageToEdit={imageToEdit}
-        history={history}
-        onSelectHistoryItem={handleSelectHistoryItem}
-        isAdvancedEditOpen={isAdvancedEditOpen}
-        setIsAdvancedEditOpen={setIsAdvancedEditOpen}
-        styleStrength={styleStrength}
-        setStyleStrength={setStyleStrength}
-        creativity={creativity}
-        setCreativity={setCreativity}
-        negativePrompt={negativePrompt}
-        setNegativePrompt={setNegativePrompt}
+    <>
+      <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-gray-900 text-gray-100 md:overflow-hidden">
+        <Sidebar
+          mode={mode}
+          setMode={setMode}
+          prompt={prompt}
+          setPrompt={setPrompt}
+          editPrompt={editPrompt}
+          setEditPrompt={setEditPrompt}
+          scenePrompt={scenePrompt}
+          setScenePrompt={setScenePrompt}
+          ideasPrompt={ideasPrompt}
+          setIdeasPrompt={setIdeasPrompt}
+          aspectRatio={aspectRatio}
+          setAspectRatio={setAspectRatio}
+          imageQuality={imageQuality}
+          setImageQuality={setImageQuality}
+          isLoading={isLoading}
+          onGenerateImage={handleGenerateImage}
+          onEditImage={handleEditImage}
+          onGenerateScene={handleGenerateScene}
+          onGetIdeas={handleGetIdeas}
+          onFileChange={handleFileChange}
+          imageToEdit={imageToEdit}
+          history={history}
+          onSelectHistoryItem={handleSelectHistoryItem}
+          isAdvancedEditOpen={isAdvancedEditOpen}
+          setIsAdvancedEditOpen={setIsAdvancedEditOpen}
+          styleStrength={styleStrength}
+          setStyleStrength={setStyleStrength}
+          creativity={creativity}
+          setCreativity={setCreativity}
+          negativePrompt={negativePrompt}
+          setNegativePrompt={setNegativePrompt}
+          hasApiKey={hasApiKey}
+          onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+        />
+        <MainContent
+          mode={mode}
+          isLoading={isLoading}
+          error={error}
+          generatedImage={resultState.image}
+          generatedText={resultState.text}
+          groundingSources={resultState.sources}
+          undo={undo}
+          redo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onTransferToEdit={handleTransferToEdit}
+        />
+      </div>
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSave={handleSaveApiKey}
+        currentApiKey={apiKey}
       />
-      <MainContent
-        mode={mode}
-        isLoading={isLoading}
-        error={error}
-        generatedImage={resultState.image}
-        generatedText={resultState.text}
-        groundingSources={resultState.sources}
-        undo={undo}
-        redo={redo}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onTransferToEdit={handleTransferToEdit}
-      />
-    </div>
+    </>
   );
 };
 
